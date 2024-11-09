@@ -1,3 +1,5 @@
+import random
+
 from .argparser import parse_args
 
 def main():
@@ -6,6 +8,8 @@ def main():
     """
     args = parse_args()
     print(args)
+    
+    random.seed(args.seed)
     
 
 if __name__ == "__main__":

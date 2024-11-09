@@ -14,7 +14,8 @@ def parse_args():
         "-f",
         "--filename",
         help="Program to analyse",
-        type=str
+        type=str,
+        required=True
     )
     command_parser.add_argument(
         "-v",
@@ -33,6 +34,12 @@ def parse_args():
         "--test",
         nargs="+",
         help="Folds for the test set"
+    )
+
+    command_parser.add_argument(
+        "--seed",
+        help="Seed for the random generator",
+        default=42
     )
 
     return command_parser.parse_args()

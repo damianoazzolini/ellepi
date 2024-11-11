@@ -1,10 +1,15 @@
 import random
+import sys
+
+from .variable_placer import Atom
 
 class GeneticOptions:
     """
     Wrapper for all the options of the genetic algorithm.
     """
     def __init__(self) -> None:
+        self.rules_to_generate : int = 10 # rules to generate for the available population
+        self.max_initial_rule_length : int = 3
         self.population_size : int = 50
         self.mutation_probability : float = 0.05
         self.number_of_evolutionary_cycles : int = 1000
@@ -15,13 +20,34 @@ class GeneticOptions:
 
 class Rule:
     """
-    Wrapper for rules.
+    A rule is represented by two list of lists, one for the head and one
+    for the body.
+    Each element of the two list has the same structure: a list (not tuple
+    since tuples are immutable) containing the index of the head atom
+    and the index for its instantiation.
     """
     def __init__(self,
-            rule_as_string : str
+            head_candidates : 'list[Atom]',
+            body_candidates : 'list[Atom]',
+            n_body_atoms : int
         ) -> None:
-        self.rule_as_string = rule_as_string
-        self.weight = 0
+        self.head_candidates = head_candidates
+        self.body_candidates = body_candidates
+        self.head : 'list[int]' = []
+        self.body : 'list[list[int]]' = []
+        
+        # generate a random rule
+        selected_atom = random.randint(0, len(head_candidates) - 1)
+        selected_instantiation = random.randint(0, len(head_candidates[selected_atom].possible_instantiations) - 1)
+        self.head = [selected_atom, selected_instantiation]
+
+        
+        for _ in range(n_body_atoms):
+            selected_atom = random.randint(0, len(body_candidates) - 1)
+            selected_instantiation = random.randint(0, len(body_candidates[selected_atom].possible_instantiations) - 1)
+            self.body.append([selected_atom,selected_instantiation])
+            
+        self.body.sort(key=lambda x : x[0]) # keep them sorted, for fast comparison
     
     def evaluate_and_assign_weight(self):
         """
@@ -31,13 +57,37 @@ class Rule:
         self.weight = -1
     
     def __str__(self) -> str:
-        return f"{self.rule_as_string} - weight: {self.weight}"
+        a = self.head[0]
+        i = self.head[1]
+        head_atom = self.head_candidates[a].possible_instantiations[i]
+        
+        body_atoms : 'list[str]' = []
+        for b in self.body:
+            a = b[0]
+            i = b[1]
+            body_atom = self.body_candidates[a].possible_instantiations[i]
+            body_atoms.append(body_atom)
+        
+        bas = ','.join(body_atoms)
+        return f"{head_atom} :- {bas}."
     def __repr__(self) -> str:
         return self.__str__()
+    def __eq__(self, other: object) -> bool:
+        same_head = (self.head == other.head)
+        same_body = (sorted(self.body) == sorted(other.body))
+        return same_head and same_body
+    def __gt__(self, other) -> bool:
+        ha = (self.head[0] > other.head[0])
+        hi = (self.head[1] > other.head[1])
+        ba = False
+        for a, b in zip(self.body,other.body):
+            ba = ba and (a[0] > b[0])
+        return ha or hi or ba
 
 class Individual:
     """
     Individual for the genetic algorithm.
+    An individual is represented by a set of rules.    
     """
     def __init__(self,
             rules : 'list[Rule]'
@@ -62,7 +112,6 @@ class Individual:
         return sorted(self.rules) == sorted(other.rules)
     def __gt__(self, other) -> bool:
         return self.score > other.score
-        
 
 
 class GeneticAlgorithm:
@@ -70,8 +119,12 @@ class GeneticAlgorithm:
     Class defining the genetic algorithm.
     """
     def __init__(self,
+            head_candidates : 'list[Atom]',
+            body_candidates : 'list[Atom]',
             options : GeneticOptions
         ) -> None:
+        self.head_candidates = head_candidates
+        self.body_candidates = body_candidates
         self.options = options
         self.population : 'list[Individual]' = []
         
@@ -86,6 +139,18 @@ class GeneticAlgorithm:
         available_rules : 'list[Rule]' = []
         max_attempts : int = 10_000
         
+        # generate the available rules
+        for _ in range(self.options.rules_to_generate):
+            rl = random.randint(1, self.options.max_initial_rule_length) # random body length
+            available_rules.append(Rule(self.head_candidates, self.body_candidates, rl))
+        
+        available_rules.sort()
+        
+        if self.options.verbosity >= 2:
+            print("Initial available rules")
+            print(*available_rules, sep="\n")
+        
+        sys.exit()
         # evaluates rules for weighted sampling
         if self.options.sampling_rules_method == "weighted":
             for r in available_rules:

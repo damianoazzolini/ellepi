@@ -37,7 +37,7 @@ def main():
     genetic_options = GeneticOptions()
     genetic_options.verbosity = args.verbosity
     
-    genetic_alg = GeneticAlgorithm(atoms_head, atoms_body, genetic_options)
+    genetic_alg = GeneticAlgorithm(atoms_head, atoms_body, prolog_int, genetic_options)
     
     
     # get the modes from the file to generate atoms

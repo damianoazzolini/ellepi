@@ -2,6 +2,7 @@ import random
 import sys
 
 from .variable_placer import Atom
+from .prolog_interface import PrologInterface
 
 class GeneticOptions:
     """
@@ -35,13 +36,13 @@ class Rule:
         self.body_candidates = body_candidates
         self.head : 'list[int]' = []
         self.body : 'list[list[int]]' = []
+        self.weight : float = 0
         
         # generate a random rule
         selected_atom = random.randint(0, len(head_candidates) - 1)
         selected_instantiation = random.randint(0, len(head_candidates[selected_atom].possible_instantiations) - 1)
         self.head = [selected_atom, selected_instantiation]
 
-        
         for _ in range(n_body_atoms):
             selected_atom = random.randint(0, len(body_candidates) - 1)
             selected_instantiation = random.randint(0, len(body_candidates[selected_atom].possible_instantiations) - 1)
@@ -49,18 +50,7 @@ class Rule:
             
         self.body.sort(key=lambda x : x[0]) # keep them sorted, for fast comparison
     
-    def evaluate_and_assign_weight(self):
-        """
-        Computes the weight of a single rule (NLL).
-        Higher is better.
-        """
-        self.weight = -1
-    
-    def __str__(self) -> str:
-        a = self.head[0]
-        i = self.head[1]
-        head_atom = self.head_candidates[a].possible_instantiations[i]
-        
+    def _get_body_atoms(self) -> 'str':
         body_atoms : 'list[str]' = []
         for b in self.body:
             a = b[0]
@@ -68,8 +58,19 @@ class Rule:
             body_atom = self.body_candidates[a].possible_instantiations[i]
             body_atoms.append(body_atom)
         
-        bas = ','.join(body_atoms)
-        return f"{head_atom} :- {bas}."
+        return ','.join(body_atoms)
+
+    def _get_head_atom(self) -> 'str':
+        a = self.head[0]
+        i = self.head[1]
+        head_atom = self.head_candidates[a].possible_instantiations[i]
+        
+        return head_atom
+
+    def get_rule_as_str_with_weight(self) -> str:
+        return f"{self._get_head_atom()} :- {self._get_body_atoms()} : {self.weight}"
+    def __str__(self) -> str:
+        return f"{self._get_head_atom()} :- {self._get_body_atoms()}"
     def __repr__(self) -> str:
         return self.__str__()
     def __eq__(self, other: object) -> bool:
@@ -121,10 +122,12 @@ class GeneticAlgorithm:
     def __init__(self,
             head_candidates : 'list[Atom]',
             body_candidates : 'list[Atom]',
+            prolog_int : PrologInterface,
             options : GeneticOptions
         ) -> None:
         self.head_candidates = head_candidates
         self.body_candidates = body_candidates
+        self.prolog_int = prolog_int
         self.options = options
         self.population : 'list[Individual]' = []
         
@@ -142,23 +145,25 @@ class GeneticAlgorithm:
         # generate the available rules
         for _ in range(self.options.rules_to_generate):
             rl = random.randint(1, self.options.max_initial_rule_length) # random body length
-            available_rules.append(Rule(self.head_candidates, self.body_candidates, rl))
+            r = Rule(self.head_candidates, self.body_candidates, rl)
+            available_rules.append(r)
         
         available_rules.sort()
+        if self.options.sampling_rules_method == "weighted":
+            # much faster than doing one by one
+            ll_rules = self.prolog_int.compute_ll_rules([str(r) for r in available_rules])
+            
+            for ll, idx in zip(ll_rules,range(len(available_rules))):
+                available_rules[idx].weight = ll
         
         if self.options.verbosity >= 2:
             print("Initial available rules")
-            print(*available_rules, sep="\n")
+            for r in available_rules:
+                print(r.get_rule_as_str_with_weight())
+                
+            # print(*available_rules, sep="\n")
         
         sys.exit()
-        # evaluates rules for weighted sampling
-        if self.options.sampling_rules_method == "weighted":
-            for r in available_rules:
-                r.evaluate_and_assign_weight()
-            # sort rules: higher NLL is better
-            # available_rules.sort(key=lambda x : x.weight) # not needed
-            if self.options.verbosity >= 3:
-                print(*available_rules)
         
         attempts = 0
         while len(population) < self.options.population_size:

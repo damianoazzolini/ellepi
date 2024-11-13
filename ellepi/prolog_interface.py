@@ -17,7 +17,7 @@ class PrologInterface:
         f = open(bg, "r")
         lines_bg = f.read()
         f.close()
-        self.lines_bg = lines_bg + GET_MODE_CODE
+        self.lines_bg = lines_bg + GET_MODE_CODE + GET_LL_CODE
 
     def get_modes(self) -> 'tuple[list[list[str]], list[list[str]]]':
         """
@@ -42,6 +42,29 @@ class PrologInterface:
 
         return modeh, modeb
 
+    def compute_ll_rules(self, r_list : 'list[str]') -> 'list[float]':
+        """
+        Computes the LL of the rule.
+        """
+        
+        in_p = ""
+        for r in r_list:
+            r = r.split(":-") # to add the probability
+            r = r[0] + ":0.5 :- " + r[1]
+            
+            in_p += f"in([({r})]).\n"
+                
+        janus.consult("bg", self.lines_bg + f"\n{in_p}\n")
+        
+        res = janus.query_once("get_lls(LL).")
+        if res["truth"]:
+            ll = res["LL"]
+        else:
+            print(f"Error in computing LL for rule {r}")
+            sys.exit()
+        
+        return ll
+
 
 GET_MODE_CODE = """
 get_arguments(Atom,Arguments):-
@@ -53,4 +76,15 @@ get_mode(HorB,LA):-
     	findall(A,modeb(_,A),LM)
     ),
     maplist(get_arguments,LM,LA).
+"""
+
+GET_LL_CODE = """
+:- style_check(-discontiguous).
+:- style_check(-singleton).
+
+get_ll(LL):-
+  in(P),test(P,[train],LL,_,_,_,_).
+
+get_lls(LLList):-
+  findall(LL,(in(P),test(P,[train],LL,_,_,_,_)),LLList).
 """

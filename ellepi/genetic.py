@@ -11,7 +11,7 @@ class GeneticOptions:
     def __init__(self) -> None:
         self.rules_to_generate : int = 10 # rules to generate for the available population
         self.max_initial_rule_length : int = 3
-        self.population_size : int = 50
+        self.population_size : int = 10
         self.mutation_probability : float = 0.05
         self.number_of_evolutionary_cycles : int = 1000
         self.initial_number_of_rules_per_individual : int = 6
@@ -88,13 +88,14 @@ class Rule:
 class Individual:
     """
     Individual for the genetic algorithm.
-    An individual is represented by a set of rules.    
+    An individual is represented by a set of rules.
     """
     def __init__(self,
             rules : 'list[Rule]'
         ) -> None:
         self.rules = rules
         self.score : float = 0
+        self.compute_score()
     
     def compute_score(self):
         """
@@ -106,7 +107,8 @@ class Individual:
     
     
     def __str__(self) -> str:
-        return f"{self.rules} with score: {self.score}"
+        s = "\n".join([str(r) for r in self.rules])
+        return f"Individual with score: {self.score}\n" + s + "\n---\n"
     def __repr__(self) -> str:
         return self.__str__()
     def __eq__(self, other: object) -> bool:
@@ -163,13 +165,11 @@ class GeneticAlgorithm:
                 
             # print(*available_rules, sep="\n")
         
-        sys.exit()
-        
         attempts = 0
         while len(population) < self.options.population_size:
             # perform weighted sampling for individuals
             if self.options.sampling_rules_method == "weighted":
-                weights = [w.weight for w in available_rules]
+                weights = [-w.weight for w in available_rules] # - since LL is negative
                 current_rules = random.choices(
                     population=available_rules,
                     weights=weights,
@@ -192,12 +192,30 @@ class GeneticAlgorithm:
             if attempts >= max_attempts:
                 print("Exited sampling population loop due to exceeding number of attempts")
                 print(f"max: {max_attempts}, length population: {len(population)}")
-            
+        
+        # TODO: compute the score, something like this
+        # ll_rules = self.prolog_int.compute_ll_rules([str(r) for r in available_rules])
+        pop_as_list : 'list[list[str]]' = []
+        for e in population:
+            rules_p : 'list[str]' = []
+            for r in e.rules:
+                rules_p.append(str(r))
+            pop_as_list.append(rules_p)
+
+        ll_rules = self.prolog_int.compute_ll_programs(pop_as_list)
+        
+        print(ll_rules)
+        
+        for ll, idx in zip(ll_rules,range(len(population))):
+            population[idx].score = ll
+        
         # sort the population in terms of score
-        population.sort()
+        population.sort(reverse=True)
         
         if self.options.verbosity >= 3:
             print(*population)
+        
+        sys.exit()
 
     
     def run_genetic_loop(self):

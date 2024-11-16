@@ -39,6 +39,25 @@ def main():
     
     genetic_alg = GeneticAlgorithm(atoms_head, atoms_body, prolog_int, genetic_options)
     
+    best_individual = genetic_alg.run_genetic_loop()
+
+    ir = best_individual.get_individual_as_input_program()
+    
+    print("--- Best individual ---")
+    print(best_individual)
+    print(ir)
+    
+    ll_ind_train = prolog_int.compute_ll_rules([ir], "train")
+    print(f"LL on training: {ll_ind_train}")
+    # ll_ind_test = prolog_int.compute_ll_rules([ir], "test")
+    # print(f"LL on test: {ll_ind_test}")
+    print("Testng results")
+    program, ll_test, aucroc, aucpr = prolog_int.compute_test_results(ir)
+    print(program)
+    print(f"LL test: {ll_test}")
+    print(f"AUCROC: {aucroc}")
+    print(f"AUCPR: {aucpr}")
+    
     
     # get the modes from the file to generate atoms
     

@@ -1,5 +1,7 @@
+import copy
 import random
 import sys
+import time
 
 from .variable_placer import Atom
 from .prolog_interface import PrologInterface
@@ -13,10 +15,11 @@ class GeneticOptions:
         self.max_initial_rule_length : int = 3
         self.population_size : int = 10
         self.mutation_probability : float = 0.05
-        self.number_of_evolutionary_cycles : int = 1000
+        self.number_of_evolutionary_cycles : int = 100
         self.initial_number_of_rules_per_individual : int = 6
         self.sampling_rules_method : str = "weighted" # or random
         self.verbosity : int = 0
+        self.iterations_print_step : int = 10
 
 
 class Rule:
@@ -67,6 +70,14 @@ class Rule:
         
         return head_atom
 
+    def get_rule_as_input_program(self) -> str:
+        """
+        Returns a rule as an input program for SLIPCOVER.
+        """
+        r = str(self).split(":-") # to add the probability
+        r = r[0] + ":0.5 :- " + r[1]
+        return f"in([({r})])."
+    
     def get_rule_as_str_with_weight(self) -> str:
         return f"{self._get_head_atom()} :- {self._get_body_atoms()} : {self.weight}"
     def __str__(self) -> str:
@@ -95,17 +106,29 @@ class Individual:
         ) -> None:
         self.rules = rules
         self.score : float = 0
-        self.compute_score()
+        # self.compute_score()
     
-    def compute_score(self):
+    # def compute_score(self):
+    #     """
+    #     Evaluates the score of the current individual.
+    #     """
+    #     # call LIFTCOVER to perform parameter learning on the current
+    #     # program
+    #     self.score = -1
+    
+    def get_individual_as_input_program(self) -> str:
         """
-        Evaluates the score of the current individual.
+        Returns an individual as an input program for SLIPCOVER.
         """
-        # call LIFTCOVER to perform parameter learning on the current
-        # program
-        self.score = -1
-    
-    
+        current_in = "in(["
+        for rule in self.rules:
+            r = str(rule).split(":-") # to add the probability
+            r = r[0] + ":0.5 :- " + r[1]
+            current_in += f"({r}),"
+        current_in = current_in[:-1]
+        current_in += "])."
+        return current_in
+
     def __str__(self) -> str:
         s = "\n".join([str(r) for r in self.rules])
         return f"Individual with score: {self.score}\n" + s + "\n---\n"
@@ -153,7 +176,8 @@ class GeneticAlgorithm:
         available_rules.sort()
         if self.options.sampling_rules_method == "weighted":
             # much faster than doing one by one
-            ll_rules = self.prolog_int.compute_ll_rules([str(r) for r in available_rules])
+            rr = [r.get_rule_as_input_program() for r in available_rules]
+            ll_rules = self.prolog_int.compute_ll_rules(rr, "train")
             
             for ll, idx in zip(ll_rules,range(len(available_rules))):
                 available_rules[idx].weight = ll
@@ -175,6 +199,7 @@ class GeneticAlgorithm:
                     weights=weights,
                     k=self.options.initial_number_of_rules_per_individual
                 )
+                current_rules.sort()
                 new_individual = Individual(current_rules)
             else:
                 new_individual = Individual(
@@ -185,7 +210,7 @@ class GeneticAlgorithm:
                 )
             
             if new_individual not in population:
-                new_individual.compute_score()
+                # new_individual.compute_score()
                 population.append(new_individual)
             
             attempts += 1
@@ -193,43 +218,157 @@ class GeneticAlgorithm:
                 print("Exited sampling population loop due to exceeding number of attempts")
                 print(f"max: {max_attempts}, length population: {len(population)}")
         
-        # TODO: compute the score, something like this
-        # ll_rules = self.prolog_int.compute_ll_rules([str(r) for r in available_rules])
-        pop_as_list : 'list[list[str]]' = []
-        for e in population:
-            rules_p : 'list[str]' = []
-            for r in e.rules:
-                rules_p.append(str(r))
-            pop_as_list.append(rules_p)
+        # computation of the LL of the individuals
 
-        ll_rules = self.prolog_int.compute_ll_programs(pop_as_list)
-        
-        print(ll_rules)
-        
+        l = [ir.get_individual_as_input_program() for ir in population]
+        ll_rules = self.prolog_int.compute_ll_rules(l, "train")
+       
         for ll, idx in zip(ll_rules,range(len(population))):
             population[idx].score = ll
         
         # sort the population in terms of score
         population.sort(reverse=True)
+        self.population = population
         
-        if self.options.verbosity >= 3:
-            print(*population)
-        
-        sys.exit()
-
+        if self.options.verbosity >= 2:
+            for i in self.population:
+                print(i)
+                print(i.get_individual_as_input_program())
+                
+            print(*self.population)
     
-    def run_genetic_loop(self):
+    def _select_individuals(self) -> 'tuple[Individual,Individual]':
+        """
+        Selections of the individuals.
+        """
+        # random selection
+        r0 = random.randint(0, len(self.population) - 1)
+        r1 = random.randint(0, len(self.population) - 1)
+        
+        return Individual(self.population[r0].rules), Individual(self.population[r1].rules)
+
+    def _crossover(self, i0 : Individual, i1 : Individual) -> 'tuple[Individual,Individual]':
+        """
+        Crossover of the individuals i0 and i1
+        """
+        idx0 = random.randint(0, len(i0.rules))
+        idx1 = random.randint(0, len(i1.rules))
+        
+        idx0 = min(len(i1.rules), idx0)
+        idx1 = min(len(i0.rules), idx1)
+        
+        new_individual_01 = Individual(i0.rules[:idx0] + i1.rules[idx0:])
+        new_individual_10 = Individual(i1.rules[:idx1] + i0.rules[idx1:])
+        
+        return (new_individual_01, new_individual_10)
+
+    def _mutate(self, i : Individual) -> Individual:
+        """
+        Applies mutation. Several kinds:
+        - add rule
+        - remove rule
+        0) do nothing
+        1) modify rule
+            - do nothing
+            - change atom
+            - change instantiation of such atom
+        """
+        prob_add_rule = 0.2
+        prob_drop_rule = 0.05
+        prob_modify = 0.25 # probability to modify a rule
+        
+        if random.random() < prob_add_rule:
+            rl = random.randint(1, self.options.max_initial_rule_length) # random body length
+            new_rule = Rule(self.head_candidates, self.body_candidates, rl)
+            i.rules.append(new_rule)
+        
+        should_drop = [random.random() < prob_drop_rule for _ in range(len(i.rules))]
+        # to_drop = [i for i, j in enumerate(should_drop) if j == True]
+        new_rules : 'list[Rule]' = []
+        for rule, drop in zip(i.rules, should_drop):
+            if not drop:
+                new_rules.append(rule)
+
+        for idx_rule, r in enumerate(new_rules):
+            if random.random() < prob_modify:
+                new_body : 'list[list[int]]' = []
+                for idx, a in enumerate(r.body):
+                    mutation_kind = random.randint(0,2)
+                    if mutation_kind == 1: # change atom
+                        selected_atom = random.randint(0, len(r.body_candidates) - 1)
+                        selected_instantiation = random.randint(0, len(r.body_candidates[selected_atom].possible_instantiations) - 1)
+                        new_body.append([selected_atom,selected_instantiation])
+                    elif mutation_kind == 2: # change instantiation
+                        selected_atom = r.body[idx][0]
+                        selected_instantiation = random.randint(0, len(r.body_candidates[selected_atom].possible_instantiations) - 1)
+                        new_body.append([selected_atom,selected_instantiation])
+                    else: # do nothing
+                        new_body.append(a)
+                new_rules[idx_rule].body = new_body
+        
+        return Individual(new_rules)
+                
+
+    def run_genetic_loop(self) -> Individual:
         """
         Runs the genetic loop.
         """
         
-        for it in range(self.options.number_of_evolutionary_cycles):
-            # select
+        start_time = time.time()
+        
+        for it in range(self.options.number_of_evolutionary_cycles + 1):
+        # for it in range(10):
+            if self.options.verbosity >= 1 and it % self.options.iterations_print_step == 0:
+                best_score = self.population[0].score
+                print(f"Iteration: {it}. Best individual with score: {best_score}")
+            # select two individuals
+            i0, i1 = self._select_individuals()
+            if self.options.verbosity >= 3:
+                print("Selected for crossover")
+                print(i0)
+                print(i1)
             
-            # mutate
+            # crossover
+            i0, i1 = self._crossover(i0,i1)
+            if self.options.verbosity >= 3:
+                print("Obtained from crossover")
+                print(i0)
+                print(i1)
+            
+            # mutate - crucial the deepcopy, since _mutate modifies the input class
+            i0 = self._mutate(copy.deepcopy(i0))
+            i1 = self._mutate(copy.deepcopy(i1))
             
             # evaluate
-            
+            ind_list = [i0,i1]
+            l = [ir.get_individual_as_input_program() for ir in ind_list]
+            ll_ind = self.prolog_int.compute_ll_rules(l, "train")
+       
+            for ll, idx in zip(ll_ind, range(len(ind_list))):
+                ind_list[idx].score = ll
+                
             # replace
+            self.population = self.population + ind_list
+            self.population.sort(reverse=True)
             
-            pass
+            # drop exceeding elements
+            if self.options.verbosity >= 3:
+                print("Dropping after insertion")
+                for i in range(1, len(ind_list) + 1):
+                    print(self.population[len(self.population) - i])
+                
+            self.population = self.population[:len(self.population) - len(ind_list)]
+        
+        if self.options.verbosity >= 2:
+            print("Final population")
+            for i in self.population:
+                print(i)
+                print(i.get_individual_as_input_program())
+            
+        # print(*self.population)
+        
+        elapsed_time = time.time() - start_time
+        if self.options.verbosity >= 1:
+            print(f"Terminated evolutionary loop in {elapsed_time} second")
+
+        return self.population[0]

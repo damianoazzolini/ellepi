@@ -17,7 +17,7 @@ class PrologInterface:
         f = open(bg, "r")
         lines_bg = f.read()
         f.close()
-        self.lines_bg = lines_bg + GET_MODE_CODE + GET_LL_CODE
+        self.lines_bg = lines_bg + GET_MODE_CODE + GET_LL_CODE + GET_TEST_RESULTS_CODE
 
     def get_modes(self) -> 'tuple[list[list[str]], list[list[str]]]':
         """
@@ -44,51 +44,53 @@ class PrologInterface:
 
         return modeh, modeb
 
-    def _query_for_ll(self, in_p : str) -> 'list[float]':
+    def _query_for_ll(self, in_p : str, train_or_test : str) -> 'list[float]':
+        """
+        Query prolog for LL.
+        """
         janus.consult("bg", self.lines_bg + f"\n{in_p}\n")
         
-        res = janus.query_once("get_lls(LL).")
+        res = janus.query_once(f"get_lls(LL, {train_or_test}).")
         if res["truth"]:
             ll = res["LL"]
         else:
-            print(f"Error in computing LL for rule {r}")
+            print(f"Error in computing LL for rule {in_p}")
             sys.exit()
         
         return ll
         
 
-    def compute_ll_rules(self, r_list : 'list[str]') -> 'list[float]':
+    def compute_ll_rules(self, r_list : 'list[str]', train_or_test : str) -> 'list[float]':
         """
-        Computes the LL of the rule.
+        Computes the LL of the rules.
         """
-        
-        in_p = ""
+        # alternative with multiple in/1
+        # return self._query_for_ll('\n'.join(r_list), train_or_test)
+        ll_list : 'list[float]' = []
         for r in r_list:
-            r = r.split(":-") # to add the probability
-            r = r[0] + ":0.5 :- " + r[1]
-            
-            in_p += f"in([({r})]).\n"
+            res = self._query_for_ll(r, train_or_test)
+            ll_list.append(res[0])
         
-        return self._query_for_ll(in_p)
-
-    def compute_ll_programs(self, r_list : 'list[list[str]]') -> 'list[float]':
+        return ll_list
+    
+    def compute_test_results(self, in_p : str):
         """
-        Compute the LL of the programs.
+        Computes test results.
         """
-        # TODO: compute the LL for each program with a Prolog call
-        print(r_list)
-        in_programs = ""
-        for individual in r_list:
-            current_in = "in(["
-            for rule in individual:
-                r = rule.split(":-") # to add the probability
-                r = r[0] + ":0.5 :- " + r[1]
-                current_in += f"({r}),"
-            current_in = current_in[:-1] 
-            current_in += "]).\n"
-            in_programs += current_in
+        janus.consult("bg", self.lines_bg + f"\n{in_p}\n")
         
-        return self._query_for_ll(in_programs)
+        res = janus.query_once("get_test_results(P,LL,AUCROC,AUCPR).")
+        if res["truth"]:
+            p = res["P"]
+            ll = res["LL"]
+            aucroc = res["AUCROC"]
+            aucpr = res["AUCPR"]
+        else:
+            print(f"Error in computing LL for rule {in_p}")
+            sys.exit()
+        
+        return p, ll, aucroc, aucpr
+        
 
 
 GET_MODE_CODE = """
@@ -107,9 +109,18 @@ GET_LL_CODE = """
 :- style_check(-discontiguous).
 :- style_check(-singleton).
 
-get_ll(LL):-
-  in(P),test(P,[train],LL,_,_,_,_).
+get_ll(LL,Fold):-
+  % in(P),test(P,[Fold],LL,_,_,_,_).
+  induce_par([Fold],P),test(P,[Fold],LL,_,_,_,_).
+  
 
-get_lls(LLList):-
-  findall(LL,(in(P),test(P,[train],LL,_,_,_,_)),LLList).
+get_lls(LLList,Fold):-
+  % findall(LL,(in(P),test(P,[Fold],LL,_,_,_,_)),LLList).
+  findall(LL,get_ll(LL,Fold),LLList).
+"""
+
+GET_TEST_RESULTS_CODE = """
+get_test_results(PS,LL,AUCROC,AUCPR):-
+    induce_par([train],P),test(P,[test],LL,AUCROC,_,AUCPR,_),
+    term_string(P,PS).
 """

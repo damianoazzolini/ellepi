@@ -256,8 +256,19 @@ class GeneticAlgorithm:
         Selections of the individuals.
         """
         # random selection
-        r0 = random.randint(0, len(self.population) - 1)
-        r1 = random.randint(0, len(self.population) - 1)
+        r0 = 0
+        r1 = 0
+        if self.options.crossover_type == "random":
+            r0 = random.randint(0, len(self.population) - 1)
+            r1 = random.randint(0, len(self.population) - 1)
+        elif self.options.crossover_type == "fittest":
+            scores = [x.score for x in self.population]
+            r0 = np.argmax(scores)
+            scores.pop(r0)
+            r1 = np.argmax(scores)
+        elif self.options.crossover_type == "torunament":
+            print("still to implement tournament crossover type")
+            sys.exit()
         
         return Individual(self.population[r0].rules), Individual(self.population[r1].rules)
 
@@ -265,17 +276,9 @@ class GeneticAlgorithm:
         """
         Crossover of the individuals i0 and i1
         """
-        if self.options.crossover_type == "random":
-            idx0 = random.randint(0, len(i0.rules))
-            idx1 = random.randint(0, len(i1.rules))
-        elif self.options.crossover_type == "fittest":
-            scores = [x.score for x in self.population]
-            idx0 = np.argmax(scores)
-            scores.pop(idx0)
-            idx1 = np.argmax(scores)
-        elif self.options.crossover_type == "torunament":
-            print("still to implement tournament crossover type")
-            sys.exit()
+
+        idx0 = random.randint(0, len(i0.rules))
+        idx1 = random.randint(0, len(i1.rules))
         
         idx0 = min(len(i1.rules), idx0)
         idx1 = min(len(i0.rules), idx1)

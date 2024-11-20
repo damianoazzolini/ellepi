@@ -52,7 +52,7 @@ def main():
     # ll_ind_test = prolog_int.compute_ll_rules([ir], "test")
     # print(f"LL on test: {ll_ind_test}")
     print("Testng results")
-    program, ll_test, aucroc, aucpr = prolog_int.compute_test_results(ir, args.test)
+    program, ll_test, aucroc, aucpr = prolog_int.compute_test_results(ir, args.train, args.test)
     print(program)
     print(f"LL test: {ll_test}")
     print(f"AUCROC: {aucroc}")

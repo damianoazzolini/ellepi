@@ -123,7 +123,7 @@ def parse_args():
         help="Crossover type.",
         type=str,
         default="random",
-        choices=["random","tournament","fittest"]
+        choices=["random","tournament","fittest","rank"]
     )
     command_parser.add_argument(
         "-psf",

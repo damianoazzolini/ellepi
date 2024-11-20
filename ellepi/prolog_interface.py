@@ -82,7 +82,7 @@ class PrologInterface:
         
         return ll_list
     
-    def compute_test_results(self, in_p : str, folds : 'list[str]'):
+    def compute_test_results(self, in_p : str, train_folds : 'list[str]', test_folds : 'list[str]'):
         """
         Computes test results.
         """
@@ -91,12 +91,18 @@ class PrologInterface:
         # janus.consult("bg", self.lines_bg + f"\n{in_p}\n")
         self._query_prolog(f"assert({in_p[:-1]}), fail.", False, "")
         
-        if folds[0] == "test":
+        if train_folds[0] == "train":
+            train_set = "train"
+        else:
+            train_set = ','.join(train_folds)
+
+        if test_folds[0] == "test":
             test_set = "test"
         else:
-            test_set = ','.join(folds)
+            test_set = ','.join(test_folds)
 
-        res = janus.query_once(f"get_test_results(P,[{test_set}],LL,AUCROC,AUCPR).")
+        # print(f"get_test_results(P,[{train_set}],[{test_set}],LL,AUCROC,AUCPR).")
+        res = janus.query_once(f"get_test_results(P,[{train_set}],[{test_set}],LL,AUCROC,AUCPR).")
         if res["truth"]:
             p = res["P"]
             ll = res["LL"]
@@ -137,7 +143,8 @@ get_lls(LLList,Fold):-
 """
 
 GET_TEST_RESULTS_CODE = """
-get_test_results(PS,Folds,LL,AUCROC,AUCPR):-
-    induce_par(Folds,P),test(P,[test],LL,AUCROC,_,AUCPR,_),
+get_test_results(PS,TrainFolds,TestFolds,LL,AUCROC,AUCPR):-
+    induce_par(TrainFolds,P),
+    test(P,TestFolds,LL,AUCROC,_,AUCPR,_),
     term_string(P,PS).
 """

@@ -287,6 +287,26 @@ class GeneticAlgorithm:
             # i0 = get_from_tournament()
             print("still to implement tournament crossover type")
             sys.exit()
+        elif self.options.crossover_type == "rank":
+            tot_rank = len(self.population) * (len(self.population) + 1) / 2
+            l : 'list[int]' = []
+            while len(l) != 2:
+                r = random.random()
+                i = 1
+                idx_selected = -1
+                for i in range(1, len(self.population) + 1):
+                    # print(f"i: {i} : {r}")
+                    r -= i / tot_rank
+                    if r < 0:
+                        break
+                # print(f"Selected: {self.population_size - i}")
+
+                if len(self.population) - i != idx_selected:
+                    l.append(len(self.population) - i)
+                    idx_selected = len(self.population) - i
+             
+            r0 = l[0]
+            r1 = l[1]
         
         return Individual(self.population[r0].rules), Individual(self.population[r1].rules)
 

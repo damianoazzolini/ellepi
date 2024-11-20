@@ -34,8 +34,8 @@ def main():
     print(atoms_body)
     
     # setup the genetic options
-    genetic_options = GeneticOptions()
-    genetic_options.verbosity = args.verbosity
+    genetic_options = GeneticOptions(args)
+    # genetic_options.verbosity = args.verbosity
     
     genetic_alg = GeneticAlgorithm(atoms_head, atoms_body, prolog_int, genetic_options)
     

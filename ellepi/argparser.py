@@ -50,4 +50,74 @@ def parse_args():
         type=int,
         default=2
     )
+    command_parser.add_argument(
+        "-p",
+        "--popsize",
+        help="Population size.",
+        type=int,
+        default=50
+    )
+    command_parser.add_argument(
+        "-ec",
+        "--evolutionary-cycles",
+        help="Number of evolutionary cycles.",
+        type=int,
+        default=100
+    )
+    command_parser.add_argument(
+        "-rpi",
+        help="Initial number of rules per individual.",
+        type=int,
+        default=6
+    )
+    command_parser.add_argument(
+        "-rtg",
+        help="Initial number of rules to generate for population initialization.",
+        type=int,
+        default=50
+    )
+    command_parser.add_argument(
+        "-par",
+        help="Mutation: probability to add a rule.",
+        type=float,
+        default=0.2
+    )
+    command_parser.add_argument(
+        "-pdr",
+        help="Mutation: probability to drop each rule.",
+        type=float,
+        default=0.05
+    )
+    command_parser.add_argument(
+        "-pm",
+        help="Mutation: probability to modify a rule.",
+        type=float,
+        default=0.25
+    )
+    command_parser.add_argument(
+        "-pcatom",
+        help="Mutation: probability to change an atom of a rule.",
+        type=float,
+        default=0.33
+    )
+    command_parser.add_argument(
+        "-pcinst",
+        help="Mutation: probability to change the instantiation of an atom of a rule.",
+        type=float,
+        default=0.33
+    )
+    command_parser.add_argument(
+        "-ctype",
+        help="Crossover type.",
+        type=str,
+        default="random",
+        choices=["random","tournament","fittest"]
+    )
+    command_parser.add_argument(
+        "-psf",
+        help="Crossover: probability to select the fittest for the tournament.",
+        type=float,
+        default=0.8
+    )
+    
     return command_parser.parse_args()

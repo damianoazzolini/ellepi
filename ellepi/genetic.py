@@ -1,7 +1,11 @@
 import copy
+import numpy as np # for argmax
 import random
 import sys
 import time
+
+
+from argparse import Namespace
 
 from .variable_placer import Atom
 from .prolog_interface import PrologInterface
@@ -10,15 +14,24 @@ class GeneticOptions:
     """
     Wrapper for all the options of the genetic algorithm.
     """
-    def __init__(self) -> None:
-        self.rules_to_generate : int = 10 # rules to generate for the available population
+    def __init__(self, args : Namespace) -> None:
+        self.population_size : int = args.popsize
+        self.number_of_evolutionary_cycles : int = args.evolutionary_cycles
+        self.initial_number_of_rules_per_individual : int = args.rpi
+        self.rules_to_generate : int = args.rtg # rules to generate for the available population
+        # for mutation
+        self.prob_add_rule : float = args.par
+        self.prob_drop_rule : float = args.pdr
+        self.prob_modify : float = args.pm
+        self.prob_change_atom : float = args.pcatom
+        self.prob_change_instantiation : float = args.pcinst
+        # for crossover
+        self.crossover_type : str = args.ctype
+        self.prob_select_fittest_tournament : float = args.psf
+        
+        self.verbosity : int = args.verbosity
         self.max_initial_rule_length : int = 3
-        self.population_size : int = 10
-        self.mutation_probability : float = 0.05
-        self.number_of_evolutionary_cycles : int = 100
-        self.initial_number_of_rules_per_individual : int = 6
         self.sampling_rules_method : str = "weighted" # or random
-        self.verbosity : int = 0
         self.iterations_print_step : int = 10
 
 
@@ -106,6 +119,7 @@ class Individual:
         ) -> None:
         self.rules = rules
         self.score : float = 0
+        self.birth_time : float = time.time()
         # self.compute_score()
     
     # def compute_score(self):
@@ -251,8 +265,17 @@ class GeneticAlgorithm:
         """
         Crossover of the individuals i0 and i1
         """
-        idx0 = random.randint(0, len(i0.rules))
-        idx1 = random.randint(0, len(i1.rules))
+        if self.options.crossover_type == "random":
+            idx0 = random.randint(0, len(i0.rules))
+            idx1 = random.randint(0, len(i1.rules))
+        elif self.options.crossover_type == "fittest":
+            scores = [x.score for x in self.population]
+            idx0 = np.argmax(scores)
+            scores.pop(idx0)
+            idx1 = np.argmax(scores)
+        elif self.options.crossover_type == "torunament":
+            print("still to implement tournament crossover type")
+            sys.exit()
         
         idx0 = min(len(i1.rules), idx0)
         idx1 = min(len(i0.rules), idx1)
@@ -273,16 +296,13 @@ class GeneticAlgorithm:
             - change atom
             - change instantiation of such atom
         """
-        prob_add_rule = 0.2
-        prob_drop_rule = 0.05
-        prob_modify = 0.25 # probability to modify a rule
         
-        if random.random() < prob_add_rule:
+        if random.random() < self.options.prob_add_rule:
             rl = random.randint(1, self.options.max_initial_rule_length) # random body length
             new_rule = Rule(self.head_candidates, self.body_candidates, rl)
             i.rules.append(new_rule)
         
-        should_drop = [random.random() < prob_drop_rule for _ in range(len(i.rules))]
+        should_drop = [random.random() < self.options.prob_drop_rule for _ in range(len(i.rules))]
         # to_drop = [i for i, j in enumerate(should_drop) if j == True]
         new_rules : 'list[Rule]' = []
         for rule, drop in zip(i.rules, should_drop):
@@ -290,10 +310,13 @@ class GeneticAlgorithm:
                 new_rules.append(rule)
 
         for idx_rule, r in enumerate(new_rules):
-            if random.random() < prob_modify:
+            if random.random() < self.options.prob_modify:
                 new_body : 'list[list[int]]' = []
                 for idx, a in enumerate(r.body):
-                    mutation_kind = random.randint(0,2)
+                    mutation_kind = random.choices([0,1,2],[
+                        self.options.prob_change_atom,
+                        self.options.prob_change_instantiation,
+                        1 - (self.options.prob_change_atom + self.options.prob_change_instantiation)])[0]
                     if mutation_kind == 1: # change atom
                         selected_atom = random.randint(0, len(r.body_candidates) - 1)
                         selected_instantiation = random.randint(0, len(r.body_candidates[selected_atom].possible_instantiations) - 1)
@@ -336,12 +359,17 @@ class GeneticAlgorithm:
                 print(i1)
             
             # mutate - crucial the deepcopy, since _mutate modifies the input class
+            if self.options.verbosity >= 3:
+                print("Mutation step")
             i0 = self._mutate(copy.deepcopy(i0))
             i1 = self._mutate(copy.deepcopy(i1))
             
             # evaluate
+            if self.options.verbosity >= 3:
+                print("Evaluation step")
             ind_list = [i0,i1]
             l = [ir.get_individual_as_input_program() for ir in ind_list]
+            # print(l)
             ll_ind = self.prolog_int.compute_ll_rules(l, "train")
        
             for ll, idx in zip(ll_ind, range(len(ind_list))):

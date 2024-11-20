@@ -18,15 +18,13 @@ class PrologInterface:
         lines_bg = f.read()
         f.close()
         self.lines_bg = lines_bg + GET_MODE_CODE + GET_LL_CODE + GET_TEST_RESULTS_CODE
+        
+        janus.consult("bg", self.lines_bg)
 
     def get_modes(self) -> 'tuple[list[list[str]], list[list[str]]]':
         """
         Gets the modeh, modeb, and targe from file.
         """
-        
-        # TODO: move consult in the constructor, so I consult the file
-        # once and then use assert and retract to set the input program
-        janus.consult("bg", self.lines_bg)
 
         res = janus.query_once("get_mode(h,L)")
         if res["truth"]:
@@ -48,7 +46,19 @@ class PrologInterface:
         """
         Query prolog for LL.
         """
-        janus.consult("bg", self.lines_bg + f"\n{in_p}\n")
+        # janus.consult("bg", self.lines_bg + f"\n{in_p}\n")
+        
+        # print(in_p)
+        
+        # sys.exit()
+        
+        res = janus.query_once("retractall(in(_)).")
+        
+        # add a fail so there is no variables bindings
+        res = janus.query_once(f"assert({in_p[:-1]}), fail.")
+        if res["truth"]:
+            print(f"Error in asserting rule {in_p}")
+            sys.exit()
         
         res = janus.query_once(f"get_lls(LL, {train_or_test}).")
         if res["truth"]:
@@ -77,7 +87,14 @@ class PrologInterface:
         """
         Computes test results.
         """
-        janus.consult("bg", self.lines_bg + f"\n{in_p}\n")
+        res = janus.query_once("retractall(in(_)).")
+        
+        # janus.consult("bg", self.lines_bg + f"\n{in_p}\n")
+        res = janus.query_once(f"assert({in_p[:-1]}), fail.")
+        if res["truth"]:
+            print(f"Error in asserting rule {in_p}")
+            sys.exit()
+        
         
         res = janus.query_once("get_test_results(P,LL,AUCROC,AUCPR).")
         if res["truth"]:

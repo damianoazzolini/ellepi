@@ -15,6 +15,7 @@ class GeneticOptions:
     Wrapper for all the options of the genetic algorithm.
     """
     def __init__(self, args : Namespace) -> None:
+        self.train_set : 'list[str]' = args.train
         self.population_size : int = args.popsize
         self.number_of_evolutionary_cycles : int = args.evolutionary_cycles
         self.initial_number_of_rules_per_individual : int = args.rpi
@@ -28,7 +29,10 @@ class GeneticOptions:
         # for crossover
         self.crossover_type : str = args.ctype
         self.prob_select_fittest_tournament : float = args.psf
+        # for dropping elements
+        self.age_regularized_prob : float = args.age
         
+        self.tournament_percentage : int = 20
         self.verbosity : int = args.verbosity
         self.max_initial_rule_length : int = 3
         self.sampling_rules_method : str = "weighted" # or random
@@ -191,7 +195,7 @@ class GeneticAlgorithm:
         if self.options.sampling_rules_method == "weighted":
             # much faster than doing one by one
             rr = [r.get_rule_as_input_program() for r in available_rules]
-            ll_rules = self.prolog_int.compute_ll_rules(rr, "train")
+            ll_rules = self.prolog_int.compute_ll_rules(rr, self.options.train_set)
             
             for ll, idx in zip(ll_rules,range(len(available_rules))):
                 available_rules[idx].weight = ll
@@ -235,7 +239,7 @@ class GeneticAlgorithm:
         # computation of the LL of the individuals
 
         l = [ir.get_individual_as_input_program() for ir in population]
-        ll_rules = self.prolog_int.compute_ll_rules(l, "train")
+        ll_rules = self.prolog_int.compute_ll_rules(l, self.options.train_set)
        
         for ll, idx in zip(ll_rules,range(len(population))):
             population[idx].score = ll
@@ -255,6 +259,19 @@ class GeneticAlgorithm:
         """
         Selections of the individuals.
         """
+        # def get_from_tournament():
+        #     prob_selecting_fittest = 0.9
+        #     how_many = min(2, int(len(self.population)*self.options.tournament_percentage/100))
+        #     random_subset = random.sample(self.population, how_many)
+        #     stop = False
+        #     best_element = min(random_subset, key=lambda x : x.score)
+        #     while len(random_subset) > 0 and not stop:
+        #         if random.random() > prob_selecting_fittest:
+        #             random_subset.remove(best_element)
+        #             best_element = min(random_subset, key=lambda x : x.score)
+        #         else:
+        #             stop = True
+        #     return best_element
         # random selection
         r0 = 0
         r1 = 0
@@ -266,7 +283,8 @@ class GeneticAlgorithm:
             r0 = np.argmax(scores)
             scores.pop(r0)
             r1 = np.argmax(scores)
-        elif self.options.crossover_type == "torunament":
+        elif self.options.crossover_type == "tournament":
+            # i0 = get_from_tournament()
             print("still to implement tournament crossover type")
             sys.exit()
         
@@ -373,7 +391,7 @@ class GeneticAlgorithm:
             ind_list = [i0,i1]
             l = [ir.get_individual_as_input_program() for ir in ind_list]
             # print(l)
-            ll_ind = self.prolog_int.compute_ll_rules(l, "train")
+            ll_ind = self.prolog_int.compute_ll_rules(l, self.options.train_set)
        
             for ll, idx in zip(ll_ind, range(len(ind_list))):
                 ind_list[idx].score = ll
@@ -387,8 +405,15 @@ class GeneticAlgorithm:
                 print("Dropping after insertion")
                 for i in range(1, len(ind_list) + 1):
                     print(self.population[len(self.population) - i])
-                
-            self.population = self.population[:len(self.population) - len(ind_list)]
+            
+            # standard: drop the worst scores
+            # age regularized: drop the oldest
+            for i in range(len(ind_list)):
+                if random.random() < self.options.age_regularized_prob:
+                    oldest_index = np.argmin([x.birth_time for x in self.population])
+                    self.population.pop(oldest_index)
+                else:
+                    self.population = self.population[:-1]
         
         if self.options.verbosity >= 2:
             print("Final population")

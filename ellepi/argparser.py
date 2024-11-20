@@ -41,6 +41,18 @@ def parse_args():
         help="Seed for the random generator",
         default=42
     )
+    command_parser.add_argument(
+        "--train",
+        help="Ids for the training set",
+        nargs="+",
+        default=["train"]
+    )
+    command_parser.add_argument(
+        "--test",
+        help="Ids for the training set",
+        nargs="+",
+        default=["test"]
+    )
 
     # arguments for the genetic algorithm
     command_parser.add_argument(
@@ -118,6 +130,12 @@ def parse_args():
         help="Crossover: probability to select the fittest for the tournament.",
         type=float,
         default=0.8
+    )
+    command_parser.add_argument(
+        "-age",
+        help="Probability to drop the oldest element.",
+        type=float,
+        default=-1.0
     )
     
     return command_parser.parse_args()

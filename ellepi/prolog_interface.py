@@ -117,8 +117,9 @@ class PrologInterface:
 
 
 GET_MODE_CODE = """
-get_arguments(Atom,Arguments):-
-    Atom =.. Arguments.
+get_arguments(Atom,AgumentsString):-
+    Atom =.. Arguments,
+    maplist(term_string,Arguments,AgumentsString).
 
 get_mode(HorB,LA):-
     (   HorB = h -> 

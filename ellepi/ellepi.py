@@ -23,11 +23,14 @@ def main():
     atoms_body : 'list[Atom]' = []
     
     for atom in modeh:
-        at = Atom(atom[0], atom[1:], args.nvars)
+        # to remove everything after -/+
+        cleaned_arguments = [a[0] for a in atom[1:]]
+        at = Atom(atom[0], cleaned_arguments, args.nvars)
         atoms_head.append(at)
-
+    
     for atom in modeb:
-        at = Atom(atom[0], atom[1:], args.nvars)
+        cleaned_arguments = [a[0] for a in atom[1:]]
+        at = Atom(atom[0], cleaned_arguments, args.nvars)
         atoms_body.append(at)
         
     print(atoms_head)

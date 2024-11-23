@@ -20,6 +20,7 @@ class GeneticOptions:
         self.number_of_evolutionary_cycles : int = args.evolutionary_cycles
         self.initial_number_of_rules_per_individual : int = args.rpi
         self.rules_to_generate : int = args.rtg # rules to generate for the available population
+        self.allow_atoms_mutliple_times : bool = False # allow the use of the same atom multiple times in the generation of rules
         # for mutation
         self.prob_add_rule : float = args.par
         self.prob_drop_rule : float = args.pdr
@@ -58,15 +59,24 @@ class Rule:
         self.body : 'list[list[int]]' = []
         self.weight : float = 0
         
+        allow_atoms_twice : bool = False
+        
         # generate a random rule
         selected_atom = random.randint(0, len(head_candidates) - 1)
         selected_instantiation = random.randint(0, len(head_candidates[selected_atom].possible_instantiations) - 1)
         self.head = [selected_atom, selected_instantiation]
 
-        for _ in range(n_body_atoms):
-            selected_atom = random.randint(0, len(body_candidates) - 1)
-            selected_instantiation = random.randint(0, len(body_candidates[selected_atom].possible_instantiations) - 1)
-            self.body.append([selected_atom,selected_instantiation])
+        if allow_atoms_twice:
+            selected_atoms = [random.randint(0, len(body_candidates) - 1) for i in range(n_body_atoms)]
+        else:
+            selected_atoms = random.sample(list(range(0,len(body_candidates) - 1)), n_body_atoms)
+        for sa in selected_atoms:
+            selected_instantiation = random.randint(0, len(body_candidates[sa].possible_instantiations) - 1)
+            self.body.append([sa,selected_instantiation])
+        # for _ in range(n_body_atoms):
+        #     selected_atom = random.randint(0, len(body_candidates) - 1)
+        #     selected_instantiation = random.randint(0, len(body_candidates[selected_atom].possible_instantiations) - 1)
+        #     self.body.append([selected_atom,selected_instantiation])
             
         self.body.sort(key=lambda x : x[0]) # keep them sorted, for fast comparison
     

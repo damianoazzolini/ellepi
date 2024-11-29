@@ -33,6 +33,7 @@ class GeneticOptions:
         # for dropping elements
         self.age_regularized_prob : float = args.age
         
+        self.regularization_score : float = args.r
         self.tournament_percentage : int = 20
         self.verbosity : int = args.verbosity
         self.max_initial_rule_length : int = 3
@@ -133,17 +134,19 @@ class Individual:
         ) -> None:
         self.rules = rules
         self.score : float = 0
+        self.complexity : int = 0
         self.birth_time : float = time.time()
+        self._compute_complexity()
         # self.compute_score()
     
-    # def compute_score(self):
-    #     """
-    #     Evaluates the score of the current individual.
-    #     """
-    #     # call LIFTCOVER to perform parameter learning on the current
-    #     # program
-    #     self.score = -1
-    
+    def _compute_complexity(self):
+        """
+        Computes the complexity of a program, to use regularization.
+        Computed as the number of body atoms.
+        """
+        for r in self.rules:
+            self.complexity += len(r.body)
+        
     def get_individual_as_input_program(self) -> str:
         """
         Returns an individual as an input program for SLIPCOVER.
@@ -159,7 +162,7 @@ class Individual:
 
     def __str__(self) -> str:
         s = "\n".join([str(r) for r in self.rules])
-        return f"Individual with score: {self.score}\n" + s + "\n---\n"
+        return f"Individual with score: {self.score}, complexity: {self.complexity}\n" + s + "\n---\n"
     def __repr__(self) -> str:
         return self.__str__()
     def __eq__(self, other: object) -> bool:
@@ -207,8 +210,8 @@ class GeneticAlgorithm:
             rr = [r.get_rule_as_input_program() for r in available_rules]
             ll_rules = self.prolog_int.compute_ll_rules(rr, self.options.train_set)
             
-            for ll, idx in zip(ll_rules,range(len(available_rules))):
-                available_rules[idx].weight = ll
+            for (ll,sum_p), idx in zip(ll_rules,range(len(available_rules))):
+                available_rules[idx].weight = ll - self.options.regularization_score*sum_p
         
         if self.options.verbosity >= 2:
             print("Initial available rules")
@@ -249,10 +252,12 @@ class GeneticAlgorithm:
         # computation of the LL of the individuals
 
         l = [ir.get_individual_as_input_program() for ir in population]
-        ll_rules = self.prolog_int.compute_ll_rules(l, self.options.train_set)
-       
-        for ll, idx in zip(ll_rules,range(len(population))):
-            population[idx].score = ll
+        ll_rules_and_sum_prob = self.prolog_int.compute_ll_rules(l, self.options.train_set)
+        # subtract regularization since the LL is neg
+        
+        for (ll,sum_p), idx in zip(ll_rules_and_sum_prob,range(len(population))):
+            # population[idx].score = ll - self.options.regularization_score*population[idx].complexity
+            population[idx].score = ll - self.options.regularization_score*sum_p
         
         # sort the population in terms of score
         population.sort(reverse=True)
@@ -422,9 +427,11 @@ class GeneticAlgorithm:
             l = [ir.get_individual_as_input_program() for ir in ind_list]
             # print(l)
             ll_ind = self.prolog_int.compute_ll_rules(l, self.options.train_set)
-       
-            for ll, idx in zip(ll_ind, range(len(ind_list))):
-                ind_list[idx].score = ll
+
+            # subtract regularization since the LL is neg
+            for (ll,sum_p), idx in zip(ll_ind, range(len(ind_list))):
+                # ind_list[idx].score = ll - self.options.regularization_score*ind_list[idx].complexity
+                ind_list[idx].score = ll - self.options.regularization_score*sum_p
                 
             # replace
             self.population = self.population + ind_list

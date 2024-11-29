@@ -137,5 +137,11 @@ def parse_args():
         type=float,
         default=-1.0
     )
+    command_parser.add_argument(
+        "-r",
+        help="Regularization.",
+        type=float,
+        default=0
+    )
     
     return command_parser.parse_args()

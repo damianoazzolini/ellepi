@@ -50,8 +50,8 @@ def main():
     print(best_individual)
     print(ir)
     
-    ll_ind_train = prolog_int.compute_ll_rules([ir], args.train)
-    print(f"LL on training: {ll_ind_train}")
+    ll_ind_train_and_probs = prolog_int.compute_ll_rules([ir], args.train)
+    print(f"LL on training: {ll_ind_train_and_probs}")
     # ll_ind_test = prolog_int.compute_ll_rules([ir], "test")
     # print(f"LL on test: {ll_ind_test}")
     print("Testng results")

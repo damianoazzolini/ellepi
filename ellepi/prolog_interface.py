@@ -22,7 +22,7 @@ class PrologInterface:
         janus.consult("bg", self.lines_bg)
     
         
-    def _query_prolog(self, query : str, expected : bool, return_var : str):
+    def _query_prolog(self, query : str, expected : bool, return_var : str = ""):
         """
         Wrapper for query once.
         """
@@ -54,33 +54,33 @@ class PrologInterface:
         # janus.consult("bg", self.lines_bg + f"\n{in_p}\n")
     
         # res = janus.query_once("retractall(in(_)).")
-        self._query_prolog("retractall(in(_)).", True, "")
+        self._query_prolog("retractall(in(_)).", True)
         
         # add a fail so there is no variables bindings
-        self._query_prolog(f"assert({in_p[:-1]}), fail.", False, "")
+        self._query_prolog(f"assert({in_p[:-1]}), fail.", False)
 
         if folds[0] == "train":
             train_set = "train"
         else:
             train_set = ','.join(folds)
 
-        ll = self._query_prolog(f"get_lls(LL, [{train_set}]).", True, "LL")
+        ll_and_sum_probs = self._query_prolog(f"get_lls(LLPList, [{train_set}]).", True, "LLPList")
         
-        return ll
+        return ll_and_sum_probs
         
 
-    def compute_ll_rules(self, r_list : 'list[str]', folds : 'list[str]') -> 'list[float]':
+    def compute_ll_rules(self, r_list : 'list[str]', folds : 'list[str]') -> 'list[list[float]]':
         """
         Computes the LL of the rules.
         """
         # alternative with multiple in/1
         # return self._query_for_ll('\n'.join(r_list), train_or_test)
-        ll_list : 'list[float]' = []
+        ll_list_sum_probs : 'list[list[float]]' = []
         for r in r_list:
             res = self._query_for_ll(r, folds)
-            ll_list.append(res[0])
+            ll_list_sum_probs.append(res)
         
-        return ll_list
+        return ll_list_sum_probs
     
     def compute_test_results(self, in_p : str, train_folds : 'list[str]', test_folds : 'list[str]'):
         """
@@ -133,14 +133,20 @@ GET_LL_CODE = """
 :- style_check(-discontiguous).
 :- style_check(-singleton).
 
-get_ll(LL,Fold):-
+get_prob((_:P;_:-_),P).
+
+get_ll(LL,SumProbs,Fold):-
   % in(P),test(P,Fold,LL,_,_,_,_).
-  induce_par(Fold,P),test(P,Fold,LL,_,_,_,_).
+  induce_par(Fold,P),
+  test(P,Fold,LL,_,_,_,_),
+  maplist(get_prob, P, ProbList),
+  sum_list(ProbList, SumProbs).
   
 
-get_lls(LLList,Fold):-
+get_lls(LLPListFlat,Fold):-
   % findall(LL,(in(P),test(P,Fold,LL,_,_,_,_)),LLList).
-  findall(LL,get_ll(LL,Fold),LLList).
+  findall([LL,P],get_ll(LL,P,Fold),LLPList),
+  flatten(LLPList,LLPListFlat).
 """
 
 GET_TEST_RESULTS_CODE = """

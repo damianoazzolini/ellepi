@@ -48,18 +48,24 @@ class Atom:
 
         ############################## BODY
         # assume no groundings
-        possible_vars = ['A'+f"{i}" for i in range(self.number_of_variables)] + ["_"]
-        if "#" not in self.modes:
-            for t in it.product(possible_vars, repeat=self.arity):
-                inst = self.name
-                if self.arity > 0:
-                    inst += "(" + ','.join(t) + ")"
-                self.possible_instantiations.append(inst)
-        else:
-            pass
-            # TODO: find instantiations
-            # TODO: i also need to consider the position of the groudnings
-            # groundings = find_instantiations() # TODO: call prolog to find them
-            # for t in it.product(possible_vars, groundings):
-            #     pass
-            
+        if '#' in self.modes:
+            print("# in mode bias not supported")
+
+        possible_vars: 'list[str]' = ['A'+f"{i}" for i in range(self.number_of_variables)] + ["_"]
+        ground_modes: 'list[int]' = [idx for idx in range(0, len(self.modes)) if self.modes[idx] not in ['+', '-', '#']]
+        for t in it.product(possible_vars, repeat=(self.arity - len(ground_modes))):
+            inst: str = self.name
+            if self.arity > 0:
+                lv : 'list[str]' = ['']*self.arity
+                # use the same ground modes
+                for nm in ground_modes:
+                    lv[nm] = self.modes[nm]
+
+                idx_var = 0
+                for i in range(0, self.arity):
+                    if lv[i] == '':
+                        lv[i] = t[idx_var]
+                        idx_var += 1
+                
+                inst += "(" + ','.join(lv) + ")"
+            self.possible_instantiations.append(inst)

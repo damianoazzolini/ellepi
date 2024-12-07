@@ -1,3 +1,4 @@
+from argparse import Namespace
 import random
 
 from .argparser import parse_args
@@ -9,7 +10,7 @@ def main():
     """
     Main method.
     """
-    args = parse_args()
+    args: Namespace = parse_args()
     print(args)
     
     random.seed(args.seed)
@@ -24,10 +25,10 @@ def main():
     
     for atom in modeh:
         # to remove everything after -/+
-        cleaned_arguments = [a[0] for a in atom[1:]]
+        cleaned_arguments: 'list[str]' = [a[0] for a in atom[1:]]
         at = Atom(atom[0], cleaned_arguments, args.nvars)
         atoms_head.append(at)
-    
+
     for atom in modeb:
         cleaned_arguments = [a[0] for a in atom[1:]]
         at = Atom(atom[0], cleaned_arguments, args.nvars)

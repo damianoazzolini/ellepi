@@ -9,15 +9,24 @@ class PrologInterface:
     def __init__(
             self,
             bg : str,
+            backend : str,
             verbosity : int = 0
         ) -> None:
         self.verbosity = verbosity
+        self.backend = backend
 
         # read bg knowledge
         f = open(bg, "r")
         lines_bg = f.read()
         f.close()
-        self.lines_bg = lines_bg + GET_MODE_CODE + GET_LL_CODE + GET_TEST_RESULTS_CODE
+
+        predicate_induce = "induce_par" if self.backend == "SLIPCOVER" else "induce_par_lift"
+        predicate_test = "test" if self.backend == "SLIPCOVER" else "test_lift"
+            
+        ll_code = GET_LL_CODE.replace("__PREDICATE_INDUCE__", predicate_induce).replace("__PREDICATE_TEST__", predicate_test)
+        test_code = GET_TEST_RESULTS_CODE.replace("__PREDICATE_INDUCE__", predicate_induce).replace("__PREDICATE_TEST__", predicate_test)
+
+        self.lines_bg = lines_bg + GET_MODE_CODE + ll_code + test_code
         
         janus.consult("bg", self.lines_bg)
     
@@ -137,8 +146,9 @@ get_prob((_:P;_:-_),P).
 
 get_ll(LL,SumProbs,Fold):-
   % in(P),test(P,Fold,LL,_,_,_,_).
-  induce_par(Fold,P),
-  test(P,Fold,LL,_,_,_,_),
+  % induce_par(Fold,P),
+  __PREDICATE_INDUCE__(Fold,P),
+  __PREDICATE_TEST__(P,Fold,LL,_,_,_,_),
   maplist(get_prob, P, ProbList),
   sum_list(ProbList, SumProbs).
   
@@ -151,7 +161,8 @@ get_lls(LLPListFlat,Fold):-
 
 GET_TEST_RESULTS_CODE = """
 get_test_results(PS,TrainFolds,TestFolds,LL,AUCROC,AUCPR):-
-    induce_par(TrainFolds,P),
-    test(P,TestFolds,LL,AUCROC,_,AUCPR,_),
+    % induce_par(TrainFolds,P),
+    __PREDICATE_INDUCE__(TrainFolds,P),
+    __PREDICATE_TEST__(P,TestFolds,LL,AUCROC,_,AUCPR,_),
     term_string(P,PS).
 """

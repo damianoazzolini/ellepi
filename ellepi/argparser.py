@@ -24,17 +24,12 @@ def parse_args():
         type=int,
         default=0
     )
-    # command_parser.add_argument(
-    #     "--train",
-    #     nargs="+",
-    #     help="Folds for the training set",
-    #     required=True
-    # )
-    # command_parser.add_argument(
-    #     "--test",
-    #     nargs="+",
-    #     help="Folds for the test set"
-    # )
+    command_parser.add_argument(
+        "--backend",
+        help="Backend for parameter learning",
+        choices=["SLIPCOVER", "LIFTCOVER"],
+        default="SLIPCOVER"
+    )
 
     command_parser.add_argument(
         "--seed",

@@ -15,7 +15,7 @@ def main():
     
     random.seed(args.seed)
     
-    prolog_int = PrologInterface(args.filename, args.verbosity)
+    prolog_int = PrologInterface(args.filename, args.backend, args.verbosity)
     
     # get modes to generate placements
     modeh, modeb = prolog_int.get_modes()

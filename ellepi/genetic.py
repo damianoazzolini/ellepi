@@ -100,7 +100,7 @@ class Rule:
 
     def get_rule_as_input_program(self) -> str:
         """
-        Returns a rule as an input program for SLIPCOVER.
+        Returns a rule as an input program for the backend.
         """
         r = str(self).split(":-") # to add the probability
         r = r[0] + ":0.5 :- " + r[1]
@@ -149,7 +149,7 @@ class Individual:
         
     def get_individual_as_input_program(self) -> str:
         """
-        Returns an individual as an input program for SLIPCOVER.
+        Returns an individual as an input program for the backend.
         """
         current_in = "in(["
         for rule in self.rules:
